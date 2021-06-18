@@ -20,6 +20,111 @@ aggregate_stats_dirs.py
                             Input directories (default: None)
       --output_dir OUTPUT_DIR
                             Output directory (default: None)
+.. _asr_align.py:
+
+asr_align.py
+~~~~~~~~~~~~
+
+.. code-block:: none
+
+    [nltk_data] Downloading package averaged_perceptron_tagger to
+    [nltk_data]     /home/runner/nltk_data...
+    [nltk_data]   Unzipping taggers/averaged_perceptron_tagger.zip.
+    [nltk_data] Downloading package cmudict to /home/runner/nltk_data...
+    [nltk_data]   Unzipping corpora/cmudict.zip.
+    usage: asr_align.py [-h] [--config CONFIG]
+                        [--log_level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}]
+                        [--ngpu NGPU] [--dtype {float16,float32,float64}]
+                        --asr_train_config ASR_TRAIN_CONFIG --asr_model_file
+                        ASR_MODEL_FILE [--token_type {char,bpe,None}]
+                        [--bpemodel BPEMODEL] [--fs FS]
+                        [--min_window_size MIN_WINDOW_SIZE]
+                        [--max_window_size MAX_WINDOW_SIZE]
+                        [--set_blank SET_BLANK] [--gratis_blank GRATIS_BLANK]
+                        [--replace_spaces_with_blanks REPLACE_SPACES_WITH_BLANKS]
+                        [--scoring_length SCORING_LENGTH]
+                        [--time_stamps {auto,fixed}]
+                        [--text_converter {tokenize,classic}]
+                        [--kaldi_style_text KALDI_STYLE_TEXT]
+                        [--print_utt_text PRINT_UTT_TEXT]
+                        [--print_utt_score PRINT_UTT_SCORE] -a AUDIO -t TEXT
+                        [-o OUTPUT]
+    
+    ASR Decoding
+    
+    optional arguments:
+      --config CONFIG       Give config file in yaml format (default: None)
+      --log_level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}
+                            The verbose level of logging (default: INFO)
+      --ngpu NGPU           The number of gpus. 0 indicates CPU mode (default: 0)
+      --dtype {float16,float32,float64}
+                            Data type (default: float32)
+    
+    Model configuration related:
+      --asr_train_config ASR_TRAIN_CONFIG
+      --asr_model_file ASR_MODEL_FILE
+    
+    Text converter related:
+      --token_type {char,bpe,None}
+                            The token type for ASR model. If not given, refers
+                            from the training args (default: None)
+      --bpemodel BPEMODEL   The model path of sentencepiece. If not given, refers
+                            from the training args (default: None)
+    
+    CTC segmentation related:
+      --fs FS               Sampling Frequency. The sampling frequency (in Hz) is
+                            needed to correctly determine the starting and ending
+                            time of aligned segments. (default: 16000)
+      --min_window_size MIN_WINDOW_SIZE
+                            Minimum window size considered for utterance.
+                            (default: None)
+      --max_window_size MAX_WINDOW_SIZE
+                            Maximum window size considered for utterance.
+                            (default: None)
+      --set_blank SET_BLANK
+                            Index of model dictionary for blank token. (default:
+                            None)
+      --gratis_blank GRATIS_BLANK
+                            Set the transition cost of the blank token to zero.
+                            Audio sections labeled with blank tokens can then be
+                            skipped without penalty. Useful if there are unrelated
+                            audio segments between utterances. (default: False)
+      --replace_spaces_with_blanks REPLACE_SPACES_WITH_BLANKS
+                            Fill blanks in between words to better model pauses
+                            between words. This option is only active for
+                            `--text_converter classic`. Segments can be misaligned
+                            if this option is combined with --gratis-blank.
+                            (default: False)
+      --scoring_length SCORING_LENGTH
+                            Changes partitioning length L for calculation of the
+                            confidence score. (default: None)
+      --time_stamps {auto,fixed}
+                            Select method how CTC index duration is estimated, and
+                            thus how the time stamps are calculated. (default:
+                            auto)
+      --text_converter {tokenize,classic}
+                            How CTC segmentation handles text. (default: tokenize)
+    
+    Input/output arguments:
+      --kaldi_style_text KALDI_STYLE_TEXT
+                            Assume that the input text file is kaldi-style
+                            formatted, i.e., the utterance name is at the
+                            beginning of each line. (default: True)
+      --print_utt_text PRINT_UTT_TEXT
+                            Include the utterance text in the segments output.
+                            (default: True)
+      --print_utt_score PRINT_UTT_SCORE
+                            Include the confidence score in the segments output.
+                            (default: True)
+      -a AUDIO, --audio AUDIO
+                            Input audio file. (default: None)
+      -t TEXT, --text TEXT  Input text file. Each line contains the ground truth
+                            of a single utterance. Kaldi-style text files include
+                            the name of the utterance as the first word in the
+                            line. (default: None)
+      -o OUTPUT, --output OUTPUT
+                            Output in the form of a `segments` file. If not given,
+                            output is written to stdout. (default: -)
 .. _asr_inference.py:
 
 asr_inference.py
@@ -141,9 +246,13 @@ asr_train.py
                         [--use_amp USE_AMP] [--log_interval LOG_INTERVAL]
                         [--use_tensorboard USE_TENSORBOARD]
                         [--use_wandb USE_WANDB] [--wandb_project WANDB_PROJECT]
-                        [--wandb_id WANDB_ID] [--detect_anomaly DETECT_ANOMALY]
+                        [--wandb_id WANDB_ID] [--wandb_entity WANDB_ENTITY]
+                        [--wandb_name WANDB_NAME]
+                        [--wandb_model_log_interval WANDB_MODEL_LOG_INTERVAL]
+                        [--detect_anomaly DETECT_ANOMALY]
                         [--pretrain_path PRETRAIN_PATH]
                         [--init_param [INIT_PARAM [INIT_PARAM ...]]]
+                        [--ignore_init_mismatch IGNORE_INIT_MISMATCH]
                         [--freeze_param [FREEZE_PARAM [FREEZE_PARAM ...]]]
                         [--num_iters_per_epoch NUM_ITERS_PER_EPOCH]
                         [--batch_size BATCH_SIZE]
@@ -232,7 +341,7 @@ asr_train.py
       --num_workers NUM_WORKERS
                             The number of workers used for DataLoader (default: 1)
       --num_att_plot NUM_ATT_PLOT
-                            The number images to plot the outputs from attention. This option makes sense only when attention-based model (default: 3)
+                            The number images to plot the outputs from attention. This option makes sense only when attention-based model. We can also disable the attention plot by setting it 0 (default: 3)
     
     distributed training related:
       --dist_backend DIST_BACKEND
@@ -307,6 +416,12 @@ asr_train.py
       --wandb_project WANDB_PROJECT
                             Specify wandb project (default: None)
       --wandb_id WANDB_ID   Specify wandb id (default: None)
+      --wandb_entity WANDB_ENTITY
+                            Specify wandb entity (default: None)
+      --wandb_name WANDB_NAME
+                            Specify wandb run name (default: None)
+      --wandb_model_log_interval WANDB_MODEL_LOG_INTERVAL
+                            Set the model log period (default: -1)
       --detect_anomaly DETECT_ANOMALY
                             Set torch.autograd.set_detect_anomaly (default: False)
     
@@ -320,6 +435,8 @@ asr_train.py
                               # Load only decoder parameters excluding decoder.embed  --init_param some/where/model.pth:decoder:decoder:decoder.embed
                               --init_param some/where/model.pth:decoder:decoder:decoder.embed
                              (default: [])
+      --ignore_init_mismatch IGNORE_INIT_MISMATCH
+                            Ignore size mismatch when loading pre-trained model (default: False)
       --freeze_param [FREEZE_PARAM [FREEZE_PARAM ...]]
                             Freeze parameters (default: [])
     
@@ -523,7 +640,7 @@ asr_train.py
                             The initialization method (default: None)
       --input_size INPUT_SIZE
                             The number of input dimension of the feature (default: None)
-      --ctc_conf CTC_CONF   The keyword arguments for CTC class. (default: {'dropout_rate': 0.0, 'ctc_type': 'builtin', 'reduce': True, 'ignore_nan_grad': False})
+      --ctc_conf CTC_CONF   The keyword arguments for CTC class. (default: {'dropout_rate': 0.0, 'ctc_type': 'builtin', 'reduce': True, 'ignore_nan_grad': True})
       --model_conf MODEL_CONF
                             The keyword arguments for model class. (default: {'ctc_weight': 0.5, 'ignore_id': -1, 'lsm_weight': 0.0, 'length_normalized_loss': False, 'report_cer': True, 'report_wer': True, 'sym_space': '<space>', 'sym_blank': '<blank>'})
     
@@ -654,9 +771,13 @@ diar_train.py
                          [--use_amp USE_AMP] [--log_interval LOG_INTERVAL]
                          [--use_tensorboard USE_TENSORBOARD]
                          [--use_wandb USE_WANDB] [--wandb_project WANDB_PROJECT]
-                         [--wandb_id WANDB_ID] [--detect_anomaly DETECT_ANOMALY]
+                         [--wandb_id WANDB_ID] [--wandb_entity WANDB_ENTITY]
+                         [--wandb_name WANDB_NAME]
+                         [--wandb_model_log_interval WANDB_MODEL_LOG_INTERVAL]
+                         [--detect_anomaly DETECT_ANOMALY]
                          [--pretrain_path PRETRAIN_PATH]
                          [--init_param [INIT_PARAM [INIT_PARAM ...]]]
+                         [--ignore_init_mismatch IGNORE_INIT_MISMATCH]
                          [--freeze_param [FREEZE_PARAM [FREEZE_PARAM ...]]]
                          [--num_iters_per_epoch NUM_ITERS_PER_EPOCH]
                          [--batch_size BATCH_SIZE]
@@ -715,7 +836,7 @@ diar_train.py
       --num_workers NUM_WORKERS
                             The number of workers used for DataLoader (default: 1)
       --num_att_plot NUM_ATT_PLOT
-                            The number images to plot the outputs from attention. This option makes sense only when attention-based model (default: 3)
+                            The number images to plot the outputs from attention. This option makes sense only when attention-based model. We can also disable the attention plot by setting it 0 (default: 3)
     
     distributed training related:
       --dist_backend DIST_BACKEND
@@ -790,6 +911,12 @@ diar_train.py
       --wandb_project WANDB_PROJECT
                             Specify wandb project (default: None)
       --wandb_id WANDB_ID   Specify wandb id (default: None)
+      --wandb_entity WANDB_ENTITY
+                            Specify wandb entity (default: None)
+      --wandb_name WANDB_NAME
+                            Specify wandb run name (default: None)
+      --wandb_model_log_interval WANDB_MODEL_LOG_INTERVAL
+                            Set the model log period (default: -1)
       --detect_anomaly DETECT_ANOMALY
                             Set torch.autograd.set_detect_anomaly (default: False)
     
@@ -803,6 +930,8 @@ diar_train.py
                               # Load only decoder parameters excluding decoder.embed  --init_param some/where/model.pth:decoder:decoder:decoder.embed
                               --init_param some/where/model.pth:decoder:decoder:decoder.embed
                              (default: [])
+      --ignore_init_mismatch IGNORE_INIT_MISMATCH
+                            Ignore size mismatch when loading pre-trained model (default: False)
       --freeze_param [FREEZE_PARAM [FREEZE_PARAM ...]]
                             Freeze parameters (default: [])
     
@@ -1173,9 +1302,13 @@ enh_train.py
                         [--use_amp USE_AMP] [--log_interval LOG_INTERVAL]
                         [--use_tensorboard USE_TENSORBOARD]
                         [--use_wandb USE_WANDB] [--wandb_project WANDB_PROJECT]
-                        [--wandb_id WANDB_ID] [--detect_anomaly DETECT_ANOMALY]
+                        [--wandb_id WANDB_ID] [--wandb_entity WANDB_ENTITY]
+                        [--wandb_name WANDB_NAME]
+                        [--wandb_model_log_interval WANDB_MODEL_LOG_INTERVAL]
+                        [--detect_anomaly DETECT_ANOMALY]
                         [--pretrain_path PRETRAIN_PATH]
                         [--init_param [INIT_PARAM [INIT_PARAM ...]]]
+                        [--ignore_init_mismatch IGNORE_INIT_MISMATCH]
                         [--freeze_param [FREEZE_PARAM [FREEZE_PARAM ...]]]
                         [--num_iters_per_epoch NUM_ITERS_PER_EPOCH]
                         [--batch_size BATCH_SIZE]
@@ -1229,7 +1362,7 @@ enh_train.py
       --num_workers NUM_WORKERS
                             The number of workers used for DataLoader (default: 1)
       --num_att_plot NUM_ATT_PLOT
-                            The number images to plot the outputs from attention. This option makes sense only when attention-based model (default: 3)
+                            The number images to plot the outputs from attention. This option makes sense only when attention-based model. We can also disable the attention plot by setting it 0 (default: 3)
     
     distributed training related:
       --dist_backend DIST_BACKEND
@@ -1304,6 +1437,12 @@ enh_train.py
       --wandb_project WANDB_PROJECT
                             Specify wandb project (default: None)
       --wandb_id WANDB_ID   Specify wandb id (default: None)
+      --wandb_entity WANDB_ENTITY
+                            Specify wandb entity (default: None)
+      --wandb_name WANDB_NAME
+                            Specify wandb run name (default: None)
+      --wandb_model_log_interval WANDB_MODEL_LOG_INTERVAL
+                            Set the model log period (default: -1)
       --detect_anomaly DETECT_ANOMALY
                             Set torch.autograd.set_detect_anomaly (default: False)
     
@@ -1317,6 +1456,8 @@ enh_train.py
                               # Load only decoder parameters excluding decoder.embed  --init_param some/where/model.pth:decoder:decoder:decoder.embed
                               --init_param some/where/model.pth:decoder:decoder:decoder.embed
                              (default: [])
+      --ignore_init_mismatch IGNORE_INIT_MISMATCH
+                            Ignore size mismatch when loading pre-trained model (default: False)
       --freeze_param [FREEZE_PARAM [FREEZE_PARAM ...]]
                             Freeze parameters (default: [])
     
@@ -1673,9 +1814,12 @@ lm_train.py
                        [--use_amp USE_AMP] [--log_interval LOG_INTERVAL]
                        [--use_tensorboard USE_TENSORBOARD] [--use_wandb USE_WANDB]
                        [--wandb_project WANDB_PROJECT] [--wandb_id WANDB_ID]
+                       [--wandb_entity WANDB_ENTITY] [--wandb_name WANDB_NAME]
+                       [--wandb_model_log_interval WANDB_MODEL_LOG_INTERVAL]
                        [--detect_anomaly DETECT_ANOMALY]
                        [--pretrain_path PRETRAIN_PATH]
                        [--init_param [INIT_PARAM [INIT_PARAM ...]]]
+                       [--ignore_init_mismatch IGNORE_INIT_MISMATCH]
                        [--freeze_param [FREEZE_PARAM [FREEZE_PARAM ...]]]
                        [--num_iters_per_epoch NUM_ITERS_PER_EPOCH]
                        [--batch_size BATCH_SIZE]
@@ -1736,7 +1880,7 @@ lm_train.py
       --num_workers NUM_WORKERS
                             The number of workers used for DataLoader (default: 1)
       --num_att_plot NUM_ATT_PLOT
-                            The number images to plot the outputs from attention. This option makes sense only when attention-based model (default: 3)
+                            The number images to plot the outputs from attention. This option makes sense only when attention-based model. We can also disable the attention plot by setting it 0 (default: 3)
     
     distributed training related:
       --dist_backend DIST_BACKEND
@@ -1811,6 +1955,12 @@ lm_train.py
       --wandb_project WANDB_PROJECT
                             Specify wandb project (default: None)
       --wandb_id WANDB_ID   Specify wandb id (default: None)
+      --wandb_entity WANDB_ENTITY
+                            Specify wandb entity (default: None)
+      --wandb_name WANDB_NAME
+                            Specify wandb run name (default: None)
+      --wandb_model_log_interval WANDB_MODEL_LOG_INTERVAL
+                            Set the model log period (default: -1)
       --detect_anomaly DETECT_ANOMALY
                             Set torch.autograd.set_detect_anomaly (default: False)
     
@@ -1824,6 +1974,8 @@ lm_train.py
                               # Load only decoder parameters excluding decoder.embed  --init_param some/where/model.pth:decoder:decoder:decoder.embed
                               --init_param some/where/model.pth:decoder:decoder:decoder.embed
                              (default: [])
+      --ignore_init_mismatch IGNORE_INIT_MISMATCH
+                            Ignore size mismatch when loading pre-trained model (default: False)
       --freeze_param [FREEZE_PARAM [FREEZE_PARAM ...]]
                             Freeze parameters (default: [])
     
@@ -2258,9 +2410,13 @@ tts_train.py
                         [--use_amp USE_AMP] [--log_interval LOG_INTERVAL]
                         [--use_tensorboard USE_TENSORBOARD]
                         [--use_wandb USE_WANDB] [--wandb_project WANDB_PROJECT]
-                        [--wandb_id WANDB_ID] [--detect_anomaly DETECT_ANOMALY]
+                        [--wandb_id WANDB_ID] [--wandb_entity WANDB_ENTITY]
+                        [--wandb_name WANDB_NAME]
+                        [--wandb_model_log_interval WANDB_MODEL_LOG_INTERVAL]
+                        [--detect_anomaly DETECT_ANOMALY]
                         [--pretrain_path PRETRAIN_PATH]
                         [--init_param [INIT_PARAM [INIT_PARAM ...]]]
+                        [--ignore_init_mismatch IGNORE_INIT_MISMATCH]
                         [--freeze_param [FREEZE_PARAM [FREEZE_PARAM ...]]]
                         [--num_iters_per_epoch NUM_ITERS_PER_EPOCH]
                         [--batch_size BATCH_SIZE]
@@ -2333,7 +2489,7 @@ tts_train.py
       --num_workers NUM_WORKERS
                             The number of workers used for DataLoader (default: 1)
       --num_att_plot NUM_ATT_PLOT
-                            The number images to plot the outputs from attention. This option makes sense only when attention-based model (default: 3)
+                            The number images to plot the outputs from attention. This option makes sense only when attention-based model. We can also disable the attention plot by setting it 0 (default: 3)
     
     distributed training related:
       --dist_backend DIST_BACKEND
@@ -2408,6 +2564,12 @@ tts_train.py
       --wandb_project WANDB_PROJECT
                             Specify wandb project (default: None)
       --wandb_id WANDB_ID   Specify wandb id (default: None)
+      --wandb_entity WANDB_ENTITY
+                            Specify wandb entity (default: None)
+      --wandb_name WANDB_NAME
+                            Specify wandb run name (default: None)
+      --wandb_model_log_interval WANDB_MODEL_LOG_INTERVAL
+                            Set the model log period (default: -1)
       --detect_anomaly DETECT_ANOMALY
                             Set torch.autograd.set_detect_anomaly (default: False)
     
@@ -2421,6 +2583,8 @@ tts_train.py
                               # Load only decoder parameters excluding decoder.embed  --init_param some/where/model.pth:decoder:decoder:decoder.embed
                               --init_param some/where/model.pth:decoder:decoder:decoder.embed
                              (default: [])
+      --ignore_init_mismatch IGNORE_INIT_MISMATCH
+                            Ignore size mismatch when loading pre-trained model (default: False)
       --freeze_param [FREEZE_PARAM [FREEZE_PARAM ...]]
                             Freeze parameters (default: [])
     
