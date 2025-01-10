@@ -3,7 +3,7 @@
 """Network related utility tools."""
 
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 import torch
@@ -581,3 +581,100 @@ def get_activation(act):
     }
 
     return activation_funcs[act]()
+
+
+def trim_by_ctc_posterior(
+    h: torch.Tensor,
+    ctc_probs: torch.Tensor,
+    masks: torch.Tensor,
+    pos_emb: torch.Tensor = None,
+):
+    """
+    Trim the encoder hidden output using CTC posterior.
+    The continuous frames in the tail that confidently represent
+    blank symbols are trimmed.
+    """
+
+    # Empirical settings
+    frame_tolerance = 5
+    conf_tolerance = 0.95
+    blank_id = 0
+
+    assert masks.size(1) == 1
+    masks = masks.squeeze(1)
+    hlens = masks.sum(dim=1)
+    assert h.size()[:2] == ctc_probs.size()[:2]
+    assert h.size(0) == hlens.size(0)
+
+    # blank frames
+    max_values, max_indices = ctc_probs.max(dim=2)
+    blank_masks = torch.logical_and(
+        max_values > conf_tolerance, max_indices == blank_id
+    )
+
+    # plus ignored frames
+    joint_masks = torch.logical_or(blank_masks, ~masks)
+
+    # lengths after the trimming
+    B, T, _ = h.size()
+    frame_idx = torch.where(
+        joint_masks, -1, torch.arange(T).unsqueeze(0).repeat(B, 1).to(h.device)
+    )
+    after_lens = torch.where(
+        frame_idx.max(dim=-1)[0] + frame_tolerance + 1 < hlens,
+        frame_idx.max(dim=-1)[0] + frame_tolerance + 1,
+        hlens,
+    )
+
+    h = h[:, : max(after_lens)]
+    masks = ~make_pad_mask(after_lens).to(h.device).unsqueeze(1)
+
+    if pos_emb is None:
+        pos_emb = None
+    elif (hlens.max() * 2 - 1).item() == pos_emb.size(1):  # RelPositionalEncoding
+        pos_emb = pos_emb[
+            :, pos_emb.size(1) // 2 - h.size(1) + 1 : pos_emb.size(1) // 2 + h.size(1)
+        ]
+    else:
+        pos_emb = pos_emb[:, : h.size(1)]
+
+    return h, masks, pos_emb
+
+
+def roll_tensor(
+    x: torch.Tensor,
+    lengths: torch.Tensor,
+    roll_amounts: Optional[torch.Tensor] = None,
+    fixed_intervals: Optional[int] = None,
+) -> torch.Tensor:
+    """Left-roll tensor x by roll_amounts, only within lengths and
+        optionally quantized.
+    Args:
+        x: input tensor (B, T, D)
+        lengths: lengths of each sequence (B,)
+        roll_amounts: random shift amounts (B,). If None, random shift
+            amounts are generated.
+        fixed_intervals: if not None, roll_amounts are quantized to
+            multiples of this.
+    Returns:
+        rolled_x: rolled tensor (B, T, D)
+    Useful to apply roll augmentation to the input, while considering
+    the input length for each sample.
+    """
+    B, T, D = x.shape
+
+    indices = torch.arange(T).unsqueeze(0).expand(B, T).to(x.device)  # (B, T)
+    lengths = lengths.unsqueeze(1)  # (B, 1)
+
+    if roll_amounts is None:
+        roll_amounts = torch.randint(0, lengths.max(), (B,), device=x.device)
+    if fixed_intervals is not None:
+        roll_amounts = (roll_amounts // fixed_intervals) * fixed_intervals
+    roll_indices = (indices - roll_amounts.unsqueeze(1)) % lengths  # (B, T)
+    roll_indices = roll_indices.unsqueeze(2).expand(-1, -1, D)  # (B, T, D)
+
+    mask = indices < lengths  # (B, T), True if position is valid
+    rolled_x = torch.empty_like(x)
+    rolled_x[mask] = x.gather(1, roll_indices)[mask]
+    rolled_x[~mask] = x[~mask]
+    return rolled_x

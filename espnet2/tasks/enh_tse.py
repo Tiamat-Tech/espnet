@@ -3,7 +3,7 @@ from typing import Callable, Collection, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
-from typeguard import check_argument_types, check_return_type
+from typeguard import typechecked
 
 from espnet2.enh.espnet_model_tse import ESPnetExtractionModel
 from espnet2.enh.extractor.abs_extractor import AbsExtractor
@@ -226,6 +226,29 @@ class TargetSpeakerExtractionTask(AbsTask):
             help="The set of all possible categories in the dataset. Used to add the "
             "category information to each sample",
         )
+        group.add_argument(
+            "--speech_segment",
+            type=int_or_none,
+            default=None,
+            help="Truncate the audios (except for the enrollment) to the specified "
+            "length if not None",
+        )
+        group.add_argument(
+            "--avoid_allzero_segment",
+            type=str2bool,
+            default=True,
+            help="Only used when --speech_segment is specified. If True, make sure "
+            "all truncated segments are not all-zero",
+        )
+        group.add_argument(
+            "--flexible_numspk",
+            type=str2bool,
+            default=False,
+            help="Whether to load variable numbers of speakers in each sample. "
+            "In this case, only the first-speaker files such as 'spk1.scp' and "
+            "'dereverb1.scp' are used, which are expected to have multiple columns. "
+            "Other numbered files such as 'spk2.scp' and 'dereverb2.scp' are ignored.",
+        )
 
         for class_choices in cls.class_choices_list:
             # Append --<name> and --<name>_conf.
@@ -233,21 +256,19 @@ class TargetSpeakerExtractionTask(AbsTask):
             class_choices.add_arguments(group)
 
     @classmethod
-    def build_collate_fn(
-        cls, args: argparse.Namespace, train: bool
-    ) -> Callable[
+    @typechecked
+    def build_collate_fn(cls, args: argparse.Namespace, train: bool) -> Callable[
         [Collection[Tuple[str, Dict[str, np.ndarray]]]],
         Tuple[List[str], Dict[str, torch.Tensor]],
     ]:
-        assert check_argument_types()
 
         return CommonCollateFn(float_pad_value=0.0, int_pad_value=0)
 
     @classmethod
+    @typechecked
     def build_preprocess_fn(
         cls, args: argparse.Namespace, train: bool
     ) -> Optional[Callable[[str, Dict[str, np.array]], Dict[str, np.ndarray]]]:
-        assert check_argument_types()
         kwargs = dict(
             train_spk2enroll=args.train_spk2enroll,
             enroll_segment=getattr(args, "enroll_segment", None),
@@ -268,10 +289,12 @@ class TargetSpeakerExtractionTask(AbsTask):
             force_single_channel=getattr(args, "force_single_channel", False),
             channel_reordering=getattr(args, "channel_reordering", False),
             categories=getattr(args, "categories", None),
+            speech_segment=getattr(args, "speech_segment", None),
+            avoid_allzero_segment=getattr(args, "avoid_allzero_segment", True),
+            flexible_numspk=getattr(args, "flexible_numspk", False),
         )
         kwargs.update(args.preprocessor_conf)
         retval = TSEPreprocessor(train=train, **kwargs)
-        assert check_return_type(retval)
         return retval
 
     @classmethod
@@ -300,12 +323,11 @@ class TargetSpeakerExtractionTask(AbsTask):
             ]
         retval += ["category"]
         retval = tuple(retval)
-        assert check_return_type(retval)
         return retval
 
     @classmethod
+    @typechecked
     def build_model(cls, args: argparse.Namespace) -> ESPnetExtractionModel:
-        assert check_argument_types()
 
         encoder = encoder_choices.get_class(args.encoder)(**args.encoder_conf)
         extractor = extractor_choices.get_class(args.extractor)(
@@ -340,5 +362,4 @@ class TargetSpeakerExtractionTask(AbsTask):
         if args.init is not None:
             initialize(model, args.init)
 
-        assert check_return_type(model)
         return model
