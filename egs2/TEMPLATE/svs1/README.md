@@ -1,12 +1,10 @@
-# ESPnet2 SVS Recipe TEMPLATE
+# Singing Voice Synthesis
 
 This is a template of SVS recipe for ESPnet2.
 
 ## Table of Contents
 
-- [ESPnet2 SVS Recipe TEMPLATE](#espnet2-svs-recipe-template)
-  - [Table of Contents](#table-of-contents)
-  - [Recipe flow](#recipe-flow)
+- [Recipe flow](#recipe-flow)
     - [1. Database-dependent data preparation](#1-database-dependent-data-preparation)
     - [2. Wav dump / Embedding preparation](#2-wav-dump--embedding-preparation)
     - [3. Filtering](#3-filtering)
@@ -16,19 +14,20 @@ This is a template of SVS recipe for ESPnet2.
     - [7. SVS inference](#7-svs-inference)
     - [8. Objective evaluation](#8-objective-evaluation)
     - [9. Model packing](#9-model-packing)
-  - [How to run](#how-to-run)
+- [How to run](#how-to-run)
     - [Naive\_RNN training](#naive_rnn-training)
     - [Naive\_RNN\_DP training](#naive_rnn_dp-training)
     - [XiaoiceSing training](#xiaoicesing-training)
     - [Diffsinger training](#diffsinger-training)
     - [VISinger (1+2) training](#visinger-12-training)
+    - [VISinger 2 Plus training](#visinger-2-plus-training)
     - [Singing Tacotron training](#singing-tacotron-training)
     - [Multi-speaker model with speaker ID embedding training](#multi-speaker-model-with-speaker-id-embedding-training)
     - [Multi-language model with language ID embedding training](#multi-language-model-with-language-id-embedding-training)
     - [Vocoder training](#vocoder-training)
     - [Evaluation](#evaluation)
-  - [About data directory](#about-data-directory)
-  - [Score preparation](#score-preparation)
+- [About data directory](#about-data-directory)
+- [Score preparation](#score-preparation)
       - [Case 1: phoneme annotation and standardized score](#case-1-phoneme-annotation-and-standardized-score)
       - [Case 2: phoneme annotation only](#case-2-phoneme-annotation-only)
     - [Problems you might meet](#problems-you-might-meet)
@@ -36,9 +35,9 @@ This is a template of SVS recipe for ESPnet2.
       - [2. Wrong lyric / midi annotation](#2-wrong-lyric--midi-annotation)
       - [3. Different lyric-phoneme pairs against the given g2p](#3-different-lyric-phoneme-pairs-against-the-given-g2p)
       - [4. Special marks in MusicXML](#4-special-marks-in-musicxml)
-  - [Supported text cleaner](#supported-text-cleaner)
-  - [Supported text frontend](#supported-text-frontend)
-  - [Supported Models](#supported-models)
+- [Supported text cleaner](#supported-text-cleaner)
+- [Supported text frontend](#supported-text-frontend)
+- [Supported Models](#supported-models)
 
 
 ## Recipe flow
@@ -205,14 +204,14 @@ Then, you can get the following directories in the recipe directory.
 
 In decoding, you can see [vocoder training](#vocoder-training) to set vocoder.
 
-For the first time, we recommend performing each stage step-by-step via `--stage` and `--stop-stage` options.
+For the first time, we recommend performing each stage step-by-step via `--stage` and `--stop_stage` options.
 ```sh
-$ ./run.sh --stage 1 --stop-stage 1
-$ ./run.sh --stage 2 --stop-stage 2
+$ ./run.sh --stage 1 --stop_stage 1
+$ ./run.sh --stage 2 --stop_stage 2
 ...
-$ ./run.sh --stage 7 --stop-stage 7
+$ ./run.sh --stage 7 --stop_stage 7
 ```
-This might helps you to understand each stage's processing and directory structure.
+This might help you understand each stage's processing and directory structure.
 
 ### Naive_RNN training
 First, complete the data preparation:
@@ -220,7 +219,18 @@ First, complete the data preparation:
 $ ./run.sh \
     --stage 1 \
     --stop_stage 4 \
+
+# for sample_rate 24000 hz
+$ ./run.sh \
+    --fs 24000 \
+    --n_shift 300 \
+    --win_length 1200 \
+    --stage 1 \
+    --stop_stage 4 \
 ```
+*Warning: Please note that there is different setting in `fs`, `n_shift` and `win_length` in different model. The window shift `n_shift` and window length `win_lenght` are adapted to the sample rate `fs`.*
+
+
 Second, check "train_config" (default `conf/train.yaml`), "score_feats_extract" (*frame level* in RNN) and modify "vocoder_file" with your own vocoder path.
 ```sh
 $ ./run.sh --stage 5 \
@@ -236,12 +246,23 @@ First, complete the data preparation:
 $ ./run.sh \
     --stage 1 \
     --stop_stage 4 \
+
+# for sample_rate 24000 hz
+$ ./run.sh \
+    --fs 24000 \
+    --n_shift 300 \
+    --win_length 1200 \
+    --stage 1 \
+    --stop_stage 4 \
 ```
+*Warning: Please note that there is different setting in `fs`, `n_shift` and `win_length` in different model. The window shift `n_shift` and window length `win_lenght` are adapted to the sample rate `fs`.*
+
+
 Second, check "train_config" (default `conf/train.yaml`), "score_feats_extract" (*syllable level* in RNN_DP) and modify "vocoder_file" with your own vocoder path.
 ```sh
 $ ./run.sh --stage 5 \
     --train_config conf/tuning/train_naive_rnn.yaml \
-    --score_feats_extract syllabel_score_feats \
+    --score_feats_extract syllable_score_feats \
     --pitch_extract dio \
     --vocoder_file ${your vocoder path} \
 ```
@@ -252,8 +273,18 @@ First, complete the data preparation:
 $ ./run.sh \
     --stage 1 \
     --stop_stage 4 \
+
+# for sample_rate 24000 hz
+$ ./run.sh \
+    --fs 24000 \
+    --n_shift 300 \
+    --win_length 1200 \
+    --stage 1 \
+    --stop_stage 4 \
 ```
-Second, check "train_config" (default `conf/train.yaml`), "score_feats_extract" (*syllabel level* in XiaoiceSing) and modify "vocoder_file" with your own vocoder path.
+*Warning: Please note that there is different setting in `fs`, `n_shift` and `win_length` in different model. The window shift `n_shift` and window length `win_lenght` are adapted to the sample rate `fs`.*
+
+Second, check "train_config" (default `conf/train.yaml`), "score_feats_extract" (*syllable level* in XiaoiceSing) and modify "vocoder_file" with your own vocoder path.
 ```sh
 $ ./run.sh --stage 5 \
     --train_config conf/tuning/train_naive_rnn.yaml \
@@ -267,6 +298,14 @@ $ ./run.sh --stage 5 \
 First, complete the data preparation:
 ```sh
 $ ./run.sh \
+    --stage 1 \
+    --stop_stage 4 \
+
+# for sample_rate 24000 hz
+$ ./run.sh \
+    --fs 24000 \
+    --n_shift 300 \
+    --win_length 1200 \
     --stage 1 \
     --stop_stage 4 \
 ```
@@ -286,27 +325,29 @@ $   ./run.sh \
     --pretrained_model ${your pretrained model path} \
     --use_feats_minmax true \
 
-# for exmaple
+# for example
 $  --pretrained_model /exp/xiaoice-2-24-250k/500epoch.pth:svs:svs.fftsinger \
 ```
 
 
 ### VISinger (1+2) training
-The VISinger / VISinger 2 configs are hard coded for 22.05 khz or 44.1 khz and use different feature extraction method. (Note that you can use any feature extraction method but the default method is `fbank`.) If you want to use it with 24 khz or 16 khz dataset, please be careful about these point.
+The VISinger / VISinger 2 configs are hard coded for 22.05 khz or 44.1 khz and use different feature extraction method. (Note that you can use any feature extraction method but the default method is `fbank`.) If you want to use it with 24 khz or 16 khz dataset, please be careful about these points.
 
-First, check "fs" (Sampling Rate) and complete the data preparation:
+First, check `fs` (Sampling Rate) and complete the data preparation:
 ```sh
 $ ./run.sh \
+    --fs 44100 \
+    --n_shift 512 \
+    --win_length 2048 \
     --stage 1 \
     --stop_stage 4 \
-    --fs 44100 \
 ```
 
-Second, check "train_config" (default `conf/train.yaml`, you can also use `--train_config ./conf/tuning/train_visinger2.yaml` to train VISinger 2), "score_feats_extract" (*syllabel level* in VISinger), "svs_task" (*gan_svs* in VISinger).
+Second, check "train_config" (default `conf/train.yaml`, you can also use `--train_config ./conf/tuning/train_visinger2.yaml` to train VISinger 2), "score_feats_extract" (*syllable level* in VISinger), "svs_task" (*gan_svs* in VISinger).
 
 ```sh
 
-# Single speaker 44100 khz case
+# Single speaker 44100 hz case
 ./run.sh \
     --stage 5 \
     --fs 44100 \
@@ -325,14 +366,48 @@ Second, check "train_config" (default `conf/train.yaml`, you can also use `--tra
 
 ```
 
+### VISinger 2 Plus training
+VISinger 2 Plus has been accepted at SLT 2024. To use the pretrained model, you can download it from [here](https://huggingface.co/yifengyu/svs_train_visinger2plus_mert_raw_phn_None_zh_200epoch). The model was trained using the **OpenCpop** dataset. Alternatively, you can choose the multi-singer **ACE-OpenCpop** dataset by downloading the model from [here](https://huggingface.co/yifengyu/svs_train_visinger2plus_mert_raw_phn_None_zh_200epoch_acesinger).
+
+To train the model, you can select multiple configurations to train on either the ACESinger or Opencpop dataset. The default setting in `train_visinger2_plus_hubert.yaml` uses `hubert_large_ll60k` as the pretrained SSL model. To switch the SSL model, you can modify the configuration by uncommenting the lines for MERT or Chinese Hubert.
+```sh
+./run.sh \
+    --stage 1 \
+    --stop_stage 8 \
+    --ngpu 1 \
+    --fs 24000 \
+    --n_fft 2048 \
+    --n_shift 480 \
+    --win_length 2048 \
+    --dumpdir dump/24k \
+    --expdir exp/24k \
+    --svs_task gan_svs \
+    --feats_extract fbank \
+    --feats_normalize none \
+    --train_config ./conf/tuning/train_visinger2_plus_hubert.yaml \
+    --inference_config ./conf/tuning/decode_vits.yaml \
+    --inference_model latest.pth \
+    --write_collected_feats false
+```
+
 ### Singing Tacotron training
 First, complete the data preparation:
 ```sh
 $ ./run.sh \
     --stage 1 \
     --stop_stage 4 \
+
+# for sample_rate 24000 hz
+$ ./run.sh \
+    --fs 24000 \
+    --n_shift 300 \
+    --win_length 1200 \
+    --stage 1 \
+    --stop_stage 4 \
 ```
-Second, check "train_config" (default `conf/train.yaml`), "score_feats_extract" (*syllabel level* in Singing Tacotron) and modify "vocoder_file" with your own vocoder path.
+*Warning: Please note that there is different setting in `fs`, `n_shift` and `win_length` in different model. The window shift `n_shift` and window length `win_lenght` are adapted to the sample rate `fs`.*
+
+Second, check "train_config" (default `conf/train.yaml`), "score_feats_extract" (*syllable level* in Singing Tacotron) and modify "vocoder_file" with your own vocoder path.
 ```sh
 $ ./run.sh --stage 5 \
     --train_config conf/tuning/train_singing_tacotron.yaml \
@@ -345,7 +420,7 @@ $ ./run.sh --stage 5 \
 
 First, you need to run from the stage 2 and 3 with `--use_sid true` to extract speaker ID.
 ```sh
-$ ./run.sh --stage 2 --stop-stage 3 --use_sid true
+$ ./run.sh --stage 2 --stop_stage 3 --use_sid true
 ```
 You can find the speaker ID file in `dump/raw/*/utt2sid`.
 Note that you need to correctly create `utt2spk` in data prep stage to generate `utt2sid`.
@@ -364,7 +439,7 @@ $ ./run.sh --stage 6 --use_sid true --train_config /path/to/your_multi_spk_confi
 
 First, you need to run from the stage 2 and 3 with `--use_lid true` to extract speaker ID.
 ```sh
-$ ./run.sh --stage 2 --stop-stage 3 --use_lid true
+$ ./run.sh --stage 2 --stop_stage 3 --use_lid true
 ```
 You can find the speaker ID file in `dump/raw/*/utt2lid`.
 **Note that you need to additionally create `utt2lang` file in stage 1 to generate `utt2lid`.**
@@ -382,7 +457,7 @@ $ ./run.sh --stage 6 --use_lid true --train_config /path/to/your_multi_lang_conf
 Of course you can further combine with speaker ID embedding.
 If you want to use both sid and lid, the process should be like this:
 ```sh
-$ ./run.sh --stage 2 --stop-stage 3 --use_lid true --use_sid true
+$ ./run.sh --stage 2 --stop_stage 3 --use_lid true --use_sid true
 ```
 Make your config.
 ```yaml
@@ -607,7 +682,7 @@ utils/validate_data_dir.sh --no-feats data/test
 
 ## Score preparation
 
-To prepara a new recipe, we first split songs into segments via `--silence` option if no official segmentation provided.
+To prepare a new recipe, we first split songs into segments via `--silence` option if no official segmentation provided.
 
 Then, we transfer the raw data into `score.json`, where situations can be categorized into two cases depending on the annotation:
 

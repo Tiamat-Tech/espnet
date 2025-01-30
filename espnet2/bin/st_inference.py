@@ -7,7 +7,7 @@ from typing import Any, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
-from typeguard import check_argument_types, check_return_type
+from typeguard import typechecked
 
 from espnet2.asr.transducer.beam_search_transducer import BeamSearchTransducer
 from espnet2.asr.transducer.beam_search_transducer import Hypothesis as TransHypothesis
@@ -17,6 +17,7 @@ from espnet2.tasks.lm import LMTask
 from espnet2.tasks.st import STTask
 from espnet2.text.build_tokenizer import build_tokenizer
 from espnet2.text.token_id_converter import TokenIDConverter
+from espnet2.text.whisper_token_id_converter import OpenAIWhisperTokenIDConverter
 from espnet2.torch_utils.device_funcs import to_device
 from espnet2.torch_utils.set_all_random_seed import set_all_random_seed
 from espnet2.utils import config_argparse
@@ -49,23 +50,24 @@ class Speech2Text:
 
     """
 
+    @typechecked
     def __init__(
         self,
-        st_train_config: Union[Path, str] = None,
-        st_model_file: Union[Path, str] = None,
-        transducer_conf: dict = None,
-        lm_train_config: Union[Path, str] = None,
-        lm_file: Union[Path, str] = None,
+        st_train_config: Union[Path, str, None] = None,
+        st_model_file: Union[Path, str, None] = None,
+        transducer_conf: Optional[dict] = None,
+        lm_train_config: Union[Path, str, None] = None,
+        lm_file: Union[Path, str, None] = None,
         ngram_scorer: str = "full",
-        ngram_file: Union[Path, str] = None,
-        token_type: str = None,
-        bpemodel: str = None,
-        src_lm_train_config: Union[Path, str] = None,
-        src_lm_file: Union[Path, str] = None,
+        ngram_file: Union[Path, str, None] = None,
+        token_type: Optional[str] = None,
+        bpemodel: Optional[str] = None,
+        src_lm_train_config: Union[Path, str, None] = None,
+        src_lm_file: Union[Path, str, None] = None,
         src_ngram_scorer: str = "full",
-        src_ngram_file: Union[Path, str] = None,
-        src_token_type: str = None,
-        src_bpemodel: str = None,
+        src_ngram_file: Union[Path, str, None] = None,
+        src_token_type: Optional[str] = None,
+        src_bpemodel: Optional[str] = None,
         device: str = "cpu",
         maxlenratio: float = 0.0,
         minlenratio: float = 0.0,
@@ -79,6 +81,7 @@ class Speech2Text:
         ngram_weight: float = 0.9,
         penalty: float = 0.0,
         nbest: int = 1,
+        normalize_length: bool = False,
         asr_beam_size: int = 20,
         asr_lm_weight: float = 1.0,
         asr_ngram_weight: float = 0.9,
@@ -90,7 +93,6 @@ class Speech2Text:
         hugging_face_decoder: bool = False,
         hugging_face_decoder_max_length: int = 256,
     ):
-        assert check_argument_types()
 
         task = STTask if not enh_s2t_task else EnhS2TTask
 
@@ -247,6 +249,7 @@ class Speech2Text:
                 vocab_size=len(token_list),
                 token_list=token_list,
                 pre_beam_score_key="full",
+                normalize_length=normalize_length,
             )
 
             # beam_search = None
@@ -358,6 +361,15 @@ class Speech2Text:
         logging.info(f"Decoding device={device}, dtype={dtype}")
 
         # 4. [Optional] Build Text converter: e.g. bpe-sym -> Text
+        # compatibility for whisper tokenizer
+        preprocessor_conf = getattr(st_train_args, "preprocessor_conf", {})
+        whisper_language = preprocessor_conf.get("whisper_language", None)
+        whisper_task = preprocessor_conf.get("whisper_task", None)
+        if whisper_language:
+            src_token_lang, token_lang = whisper_language
+        else:
+            src_token_lang, token_lang = None, None
+
         if token_type is None:
             token_type = st_train_args.token_type
         if bpemodel is None:
@@ -365,14 +377,33 @@ class Speech2Text:
 
         if token_type is None:
             tokenizer = None
-        elif token_type == "bpe" or token_type == "hugging_face":
+        elif (
+            token_type == "bpe"
+            or token_type == "hugging_face"
+            or "whisper" in token_type
+        ):
             if bpemodel is not None:
-                tokenizer = build_tokenizer(token_type=token_type, bpemodel=bpemodel)
+                tokenizer = build_tokenizer(
+                    token_type=token_type,
+                    bpemodel=bpemodel,
+                    whisper_language=token_lang,
+                    whisper_task=whisper_task,
+                )
             else:
                 tokenizer = None
         else:
             tokenizer = build_tokenizer(token_type=token_type)
-        converter = TokenIDConverter(token_list=token_list)
+        if "whisper" in token_type:
+            converter = OpenAIWhisperTokenIDConverter(
+                model_type=bpemodel,
+                language=token_lang or "en",
+                task=whisper_task or "translate",
+            )
+            beam_search.set_hyp_primer(
+                list(converter.tokenizer.sot_sequence_including_notimestamps)
+            )
+        else:
+            converter = TokenIDConverter(token_list=token_list)
         logging.info(f"Text tokenizer: {tokenizer}")
 
         if src_token_type is None:
@@ -382,16 +413,29 @@ class Speech2Text:
 
         if src_token_type is None:
             src_tokenizer = None
-        elif src_token_type == "bpe":
+        elif src_token_type == "bpe" or "whisper" in token_type:
             if src_bpemodel is not None:
                 src_tokenizer = build_tokenizer(
-                    token_type=src_token_type, bpemodel=src_bpemodel
+                    token_type=src_token_type,
+                    bpemodel=src_bpemodel,
+                    whisper_language=src_token_lang,
+                    whisper_task=whisper_task,
                 )
             else:
                 src_tokenizer = None
         else:
             src_tokenizer = build_tokenizer(token_type=src_token_type)
-        src_converter = TokenIDConverter(token_list=src_token_list)
+        if "whisper" in src_token_type:
+            src_converter = OpenAIWhisperTokenIDConverter(
+                model_type=src_bpemodel,
+                language=src_token_lang or "en",
+                task=whisper_task or "translate",
+            )
+            asr_beam_search.set_hyp_primer(
+                list(src_converter.tokenizer.sot_sequence_including_notimestamps)
+            )
+        else:
+            src_converter = TokenIDConverter(token_list=src_token_list)
         logging.info(f"Src Text tokenizer: {src_tokenizer}")
 
         self.st_model = st_model
@@ -418,6 +462,7 @@ class Speech2Text:
         self.ctc_greedy = ctc_greedy
 
     @torch.no_grad()
+    @typechecked
     def __call__(
         self, speech: Union[torch.Tensor, np.ndarray]
     ) -> List[
@@ -431,7 +476,6 @@ class Speech2Text:
             text, token, token_int, hyp
 
         """
-        assert check_argument_types()
 
         # Input as audio signal
         if isinstance(speech, np.ndarray):
@@ -568,7 +612,6 @@ class Speech2Text:
 
         if self.st_model.use_multidecoder:
             return (results, asr_results)
-        assert check_return_type(results)
         return results
 
     @staticmethod
@@ -601,6 +644,7 @@ class Speech2Text:
         return Speech2Text(**kwargs)
 
 
+@typechecked
 def inference(
     output_dir: str,
     maxlenratio: float,
@@ -618,6 +662,7 @@ def inference(
     ngram_weight: float,
     penalty: float,
     nbest: int,
+    normalize_length: bool,
     asr_ctc_weight: float,
     asr_lm_weight: float,
     asr_ngram_weight: float,
@@ -651,7 +696,6 @@ def inference(
     hugging_face_decoder: bool,
     hugging_face_decoder_max_length: int,
 ):
-    assert check_argument_types()
     if batch_size > 1:
         raise NotImplementedError("batch decoding is not implemented")
     if word_lm_train_config is not None:
@@ -699,6 +743,7 @@ def inference(
         ngram_weight=ngram_weight,
         penalty=penalty,
         nbest=nbest,
+        normalize_length=normalize_length,
         asr_beam_size=asr_beam_size,
         asr_ctc_weight=asr_ctc_weight,
         asr_lm_weight=asr_lm_weight,
@@ -1009,6 +1054,12 @@ def get_parser():
     )
     group.add_argument("--hugging_face_decoder", type=str2bool, default=False)
     group.add_argument("--hugging_face_decoder_max_length", type=int, default=256)
+    group.add_argument(
+        "--normalize_length",
+        type=str2bool,
+        default=False,
+        help="If true, best hypothesis is selected by length-normalized scores",
+    )
 
     return parser
 
